@@ -53,15 +53,15 @@
 #include <mach/msm_iomap.h>
 #include <linux/usb/msm_hsusb.h>
 #include <mach/msm_spi.h>
-#include <mach/qdsp5v2_2x/msm_lpa.h>
+#include <mach/qdsp5v2/msm_lpa.h>
 #include <mach/dma.h>
 #include <linux/android_pmem.h>
 #include <linux/input/msm_ts.h>
 #include <mach/pmic.h>
 #include <mach/rpc_pmapp.h>
-#include <mach/qdsp5v2_2x/aux_pcm.h>
-#include <mach/qdsp5v2_2x/mi2s.h>
-#include <mach/qdsp5v2_2x/audio_dev_ctl.h>
+#include <mach/qdsp5v2/aux_pcm.h>
+#include <mach/qdsp5v2/mi2s.h>
+#include <mach/qdsp5v2/audio_dev_ctl.h>
 #ifdef CONFIG_HTC_BATTCHG
 #include <mach/htc_battery.h>
 #endif
@@ -94,8 +94,8 @@
 #include "acpuclock.h"
 #include <mach/dal_axi.h>
 #include <mach/msm_serial_hs.h>
-#include <mach/qdsp5v2_2x/mi2s.h>
-#include <mach/qdsp5v2_2x/audio_dev_ctl.h>
+#include <mach/qdsp5v2/mi2s.h>
+#include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/sdio_al.h>
 #include "smd_private.h"
 #include "board-primou.h"
@@ -2978,40 +2978,9 @@ static struct platform_device *headset_devices[] = {
 	/* Please put the headset detection driver on the last */
 };
 
-static struct headset_adc_config htc_headset_mgr_config[] = {
-	{
-		.type = HEADSET_MIC,
-		.adc_max = 58318,
-		.adc_min = 45532,
-	},
-	{
-		.type = HEADSET_BEATS,
-		.adc_max = 45531,
-		.adc_min = 33396,
-	},
-	{
-		.type = HEADSET_BEATS_SOLO,
-		.adc_max = 33395,
-		.adc_min = 23466,
-	},
-	{
-		.type = HEADSET_NO_MIC, /* HEADSET_INDICATOR */
-		.adc_max = 23465,
-		.adc_min = 9045,
-	},
-	{
-		.type = HEADSET_NO_MIC,
-		.adc_max = 9044,
-		.adc_min = 0,
-	},
-};
-
 static struct htc_headset_mgr_platform_data htc_headset_mgr_data = {
-	.driver_flag		= DRIVER_HS_MGR_FLOAT_DET,
 	.headset_devices_num	= ARRAY_SIZE(headset_devices),
 	.headset_devices	= headset_devices,
-	.headset_config_num	= ARRAY_SIZE(htc_headset_mgr_config),
-	.headset_config		= htc_headset_mgr_config,
 };
 
 static struct platform_device htc_headset_mgr = {
@@ -3026,7 +2995,7 @@ static void headset_device_register(void)
 {
 	pr_info("[HS_BOARD] (%s) Headset device register\n", __func__);
 	platform_device_register(&htc_headset_mgr);
-}
+};
 
 /* HEADSET DRIVER END */
 
@@ -3935,7 +3904,6 @@ static void __init primou_init(void)
 	buses_init();
 	if (board_mfg_mode()==1) {
 		pm_led_config[0].out_current = 40;
-		htc_headset_mgr_config[0].adc_max = 65535;
 	}
 
 	device_mid = get_model_id();
@@ -4064,13 +4032,10 @@ static int __init pmem_adsp_size_setup(char *p)
 }
 early_param("pmem_adsp_size", pmem_adsp_size_setup);
 
-#ifdef CONFIG_ION_MSM
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 static struct ion_co_heap_pdata co_ion_pdata = {
 	.adjacent_mem_id = INVALID_HEAP_ID,
 	.align = PAGE_SIZE,
 };
-#endif
 
 static struct ion_platform_data ion_pdata = {
 	.nr = MSM_ION_HEAP_NUM,
@@ -4080,8 +4045,7 @@ static struct ion_platform_data ion_pdata = {
 			.type	= ION_HEAP_TYPE_SYSTEM,
 			.name	= ION_VMALLOC_HEAP_NAME,
 		},
-#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-
+		/* CAMERA */
 		{
 			.id	= ION_CAMERA_HEAP_ID,
 			.type	= ION_HEAP_TYPE_CARVEOUT,
@@ -4090,7 +4054,6 @@ static struct ion_platform_data ion_pdata = {
 			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
-
 		/* PMEM_MDP = SF */
 		{
 			.id	= ION_SF_HEAP_ID,
@@ -4100,7 +4063,6 @@ static struct ion_platform_data ion_pdata = {
 			.has_outer_cache = 1,
 			.extra_data = (void *)&co_ion_pdata,
 		},
-#endif
 	}
 };
 
@@ -4109,7 +4071,6 @@ static struct platform_device ion_dev = {
 	.id = 1,
 	.dev = { .platform_data = &ion_pdata },
 };
-#endif
 
 static struct memtype_reserve msm7x30_reserve_table[] __initdata = {
 	[MEMTYPE_SMI] = {
@@ -4122,33 +4083,22 @@ static struct memtype_reserve msm7x30_reserve_table[] __initdata = {
 	},
 };
 
-unsigned long msm_ion_camera_size;
-static void fix_sizes(void)
-{
-	msm_ion_camera_size = pmem_adsp_size;
-}
-
-static void __init size_pmem_device(struct android_pmem_platform_data *pdata, unsigned long start, unsigned long size)
-{
-	pdata->start = start;
-	pdata->size = size;
-	pr_info("%s: allocating %lu bytes at 0x%p (0x%lx physical) for %s\n",
-		__func__, size, __va(start), start, pdata->name);
-}
-
 static void __init size_pmem_devices(void)
 {
-        size_pmem_device(&android_pmem_adsp_pdata, 0, pmem_adsp_size);
+	android_pmem_adsp_pdata.size = pmem_adsp_size;
 }
-
 
 static void __init size_ion_devices(void)
 {
-	ion_pdata.heaps[1].base = 0;
 	ion_pdata.heaps[1].size = MSM_ION_CAMERA_SIZE;
-	ion_pdata.heaps[2].base = 0;
 	ion_pdata.heaps[2].size = MSM_ION_SF_SIZE;
 }
+
+static void __init reserve_ion_memory(void)
+{
+	msm7x30_reserve_table[MEMTYPE_EBI0].size += MSM_ION_SF_SIZE;
+}
+
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 {
 	if (p->size > 0) {
@@ -4164,10 +4114,10 @@ static void __init reserve_pmem_memory(void)
 
 static void __init msm7x30_calculate_reserve_sizes(void)
 {
-	fix_sizes();
 	size_pmem_devices();
 	reserve_pmem_memory();
 	size_ion_devices();
+	reserve_ion_memory();
 }
 
 static int msm7x30_paddr_to_memtype(unsigned int paddr)
